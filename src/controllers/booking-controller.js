@@ -2,29 +2,55 @@ const { StatusCodes } = require('http-status-codes');
 
 const { BookingService } = require('../services/index');
 
+const { createChannel, publishMessage} = require('../utils/messageQueue');
+const { REMINDER_BINDING_KEY } = require('../config/serverConfig');
+
+
 const bookingService = new BookingService();
 
-const create = async(req, res) => {
-    try {
-        const response = await bookingService.createBooking(req.body);
-        // console.log("From booking controller", response);
-        return res.status(StatusCodes.OK).json({
-            message: 'Successfully booked a flight',
-            success: true,
-            data: response,
-            err: {}
+class BookingController {
+
+    constructor() {
+        
+    }
+
+    async sendMessageToQueue(req, res) {
+        const channel = await createChannel();
+        const payload = {
+            data: {
+                subject: 'This is a notification from Queue.',
+                content: 'Some Queue will subscribe this.',
+                recepientEmail: '1016matrixbibek@gmail.com',
+                notificationTime: '2023-11-06T09:26:00'
+            },
+            service: 'CREATE_TICKET'
+        };
+        publishMessage(channel, REMINDER_BINDING_KEY, JSON.stringify(payload));
+        return res.status(200).json({
+            message: 'Successfully published the event'
         });
-    } catch (error) {
-        // console.log("From Booking Controller", error);
-        return res.status(error.statusCode).json({
-            message: error,
-            success: false,
-            error: error.explanation,
-            data: {}
-        })
+    }
+    
+    async create (req, res) {
+        try {
+            const response = await bookingService.createBooking(req.body);
+            console.log("FROM BOOKING CONTROLLER", response);
+            return res.status(StatusCodes.OK).json({
+                message: 'Successfully completed booking',
+                success: true,
+                err: {},
+                data: response
+            })
+        } catch (error) {
+            return res.status(error.statusCode).json({
+                message: error.message,
+                success: false,
+                err: error.explanation,
+                data: {}
+            });
+        }
     }
 }
 
-module.exports = {
-    create
-}
+
+module.exports = BookingController
